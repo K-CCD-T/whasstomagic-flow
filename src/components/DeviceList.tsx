@@ -5,7 +5,7 @@ import { Phone, Check, X, QrCode } from 'lucide-react';
 const DeviceList = () => {
   // Simulación de dispositivos conectados
   const devices = [
-    { id: 1, name: "WhatsApp Business 1", status: "connected" },
+    { id: 1, name: "WhatsApp ffffffff 1", status: "connected" },
     { id: 2, name: "WhatsApp Personal", status: "disconnected" },
   ];
 
