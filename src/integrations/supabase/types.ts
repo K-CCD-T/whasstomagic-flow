@@ -9,13 +9,236 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string
+          entity_type: string
+          id: string
+          ip_address: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          attachment_url: string | null
+          chat_id: string
+          created_at: string
+          id: string
+          is_read: boolean | null
+          message: string
+          sender_id: string
+        }
+        Insert: {
+          attachment_url?: string | null
+          chat_id: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message: string
+          sender_id: string
+        }
+        Update: {
+          attachment_url?: string | null
+          chat_id?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documentos: {
+        Row: {
+          fecha_subida: string
+          id: string
+          nombre: string
+          subido_por: string
+          tamano: number
+          ticket_id: number
+          tipo: string
+          url: string
+        }
+        Insert: {
+          fecha_subida?: string
+          id?: string
+          nombre: string
+          subido_por: string
+          tamano: number
+          ticket_id: number
+          tipo: string
+          url: string
+        }
+        Update: {
+          fecha_subida?: string
+          id?: string
+          nombre?: string
+          subido_por?: string
+          tamano?: number
+          ticket_id?: number
+          tipo?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documentos_subido_por_fkey"
+            columns: ["subido_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          apellidos: string | null
+          created_at: string
+          id: string
+          institucion: string | null
+          nombre: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          apellidos?: string | null
+          created_at?: string
+          id: string
+          institucion?: string | null
+          nombre?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          apellidos?: string | null
+          created_at?: string
+          id?: string
+          institucion?: string | null
+          nombre?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          asesor_id: string | null
+          descripcion: string
+          estado: string
+          fecha_actualizacion: string
+          fecha_completado: string | null
+          fecha_creacion: string
+          id: number
+          notas_internas: string | null
+          prioridad: string | null
+          tipo: string
+          usuario_id: string
+        }
+        Insert: {
+          asesor_id?: string | null
+          descripcion: string
+          estado?: string
+          fecha_actualizacion?: string
+          fecha_completado?: string | null
+          fecha_creacion?: string
+          id?: number
+          notas_internas?: string | null
+          prioridad?: string | null
+          tipo: string
+          usuario_id: string
+        }
+        Update: {
+          asesor_id?: string | null
+          descripcion?: string
+          estado?: string
+          fecha_actualizacion?: string
+          fecha_completado?: string | null
+          fecha_creacion?: string
+          id?: number
+          notas_internas?: string | null
+          prioridad?: string | null
+          tipo?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_asesor_id_fkey"
+            columns: ["asesor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      log_action: {
+        Args: {
+          p_user_id: string
+          p_action: string
+          p_entity_type: string
+          p_entity_id: string
+          p_details?: Json
+          p_ip_address?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

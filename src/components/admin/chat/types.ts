@@ -21,6 +21,13 @@ export interface ChatMessage {
       address?: string;
     }
   };
+  // Adding Supabase related fields
+  chat_id?: string;
+  sender_id?: string;
+  message?: string;
+  is_read?: boolean;
+  attachment_url?: string;
+  created_at?: string;
 }
 
 export interface Advisor {

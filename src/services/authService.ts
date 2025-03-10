@@ -2,6 +2,7 @@
 import api from './api';
 import { toast } from 'sonner';
 import { mockUsers } from '../components/admin/users/mockData';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LoginCredentials {
   email: string;
@@ -24,14 +25,41 @@ interface AuthResponse {
 export const authService = {
   async login(credentials: LoginCredentials): Promise<boolean> {
     try {
-      // Credenciales para demo
+      // Try Supabase login first
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: credentials.email,
+        password: credentials.password
+      });
+      
+      if (error) throw error;
+      
+      if (data.user) {
+        // Get the user profile to determine role
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (profileData) {
+          localStorage.setItem('user', JSON.stringify({
+            email: credentials.email,
+            rol: profileData.tipo,
+            nombre: `${profileData.nombre} ${profileData.apellidos}`.trim() || 'Usuario'
+          }));
+        }
+        
+        return true;
+      }
+      
+      // Fallback to demo credentials if Supabase login fails
       const demoCredentials = {
         admin: { email: 'admin@ccd.edu.pe', password: 'admin123', rol: 'admin' },
         advisor: { email: 'advisor@ccd.edu.pe', password: 'advisor123', rol: 'advisor' },
         student: { email: 'estudiante@ccd.edu.pe', password: 'estudiante123', rol: 'student' }
       };
       
-      // Para demo - acceso con credenciales específicas según tipo de usuario
+      // For demo - access with specific credentials based on user type
       if (credentials.userType === 'admin' && 
           credentials.email === demoCredentials.admin.email && 
           credentials.password === demoCredentials.admin.password) {
@@ -64,35 +92,22 @@ export const authService = {
         return true;
       }
       
-      // Try API call as fallback (will fail in demo environment)
-      try {
-        const response = await api.post<AuthResponse>('/auth/login', credentials);
-        
-        if (response.data.token) {
-          localStorage.setItem('token', response.data.token);
-        }
-        
+      // Check if any user in mockData matches the credentials as last fallback
+      const mockUser = mockUsers.find(user => 
+        user.correo === credentials.email && credentials.password === 'admin123'
+      );
+      
+      if (mockUser) {
+        localStorage.setItem('token', 'mock-jwt-token-for-demo');
+        localStorage.setItem('user', JSON.stringify({
+          email: mockUser.correo,
+          rol: mockUser.tipo,
+          nombre: `${mockUser.nombres} ${mockUser.apellidos}`
+        }));
         return true;
-      } catch (apiError) {
-        console.error('API login failed, falling back to mock check');
-        
-        // Check if any user in mockData matches the credentials
-        const mockUser = mockUsers.find(user => 
-          user.correo === credentials.email && credentials.password === 'admin123'
-        );
-        
-        if (mockUser) {
-          localStorage.setItem('token', 'mock-jwt-token-for-demo');
-          localStorage.setItem('user', JSON.stringify({
-            email: mockUser.correo,
-            rol: mockUser.tipo,
-            nombre: `${mockUser.nombres} ${mockUser.apellidos}`
-          }));
-          return true;
-        }
-        
-        throw new Error('Invalid credentials');
       }
+      
+      throw new Error('Invalid credentials');
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
       toast.error('Credenciales incorrectas');
@@ -102,8 +117,20 @@ export const authService = {
   
   async register(userData: RegisterData): Promise<boolean> {
     try {
-      await api.post('/auth/register', userData);
-      toast.success('Usuario registrado correctamente');
+      // Register with Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email: userData.email,
+        password: userData.password,
+        options: {
+          data: {
+            tipo: userData.rol
+          }
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast.success('Usuario registrado correctamente. Revise su correo para verificar la cuenta.');
       return true;
     } catch (error) {
       console.error('Error al registrar usuario:', error);
@@ -121,29 +148,26 @@ export const authService = {
         rol: "admin"
       };
       
-      // Intentamos registrar al administrador por defecto
+      // Try to create default admin
       await this.register(adminData);
       console.log('Administrador por defecto creado o ya existente');
     } catch (error) {
-      // Si falla, probablemente es porque ya existe
+      // If it fails, the admin probably already exists
       console.log('El administrador por defecto ya existe');
     }
   },
   
-  logout(): void {
-    // Eliminar token de localStorage (versión antigua)
+  async logout(): Promise<void> {
+    // Log out from Supabase
+    await supabase.auth.signOut();
+    
+    // Remove local storage items
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    
-    // Eliminar cookie (cuando el backend se actualice)
-    api.post('/auth/logout')
-      .catch(err => console.error('Error al cerrar sesión:', err));
   },
   
   isAuthenticated(): boolean {
-    // En un sistema basado en cookies, podríamos necesitar una verificación diferente
-    // Por ahora, mantenemos la verificación básica con localStorage
-    return !!localStorage.getItem('token');
+    return !!supabase.auth.getSession() || !!localStorage.getItem('token');
   },
   
   getUserRole(): string {
