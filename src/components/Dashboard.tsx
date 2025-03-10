@@ -1,12 +1,25 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Phone, Plus, Send } from "lucide-react";
+import { Phone, Plus, Send, QrCode } from "lucide-react";
 import DeviceList from './DeviceList';
 import MessageFlow from './MessageFlow';
+import QRCodeScanner from './QRCodeScanner';
 
 const Dashboard = () => {
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  
+  const handleConnectNewDevice = () => {
+    setShowQRScanner(true);
+  };
+  
+  const handleScanComplete = (deviceId: string) => {
+    console.log(`Dispositivo conectado con ID: ${deviceId}`);
+    setShowQRScanner(false);
+    // Aquí se podría actualizar el estado para añadir el nuevo dispositivo a la lista
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-[#25D366] p-4">
@@ -21,12 +34,21 @@ const Dashboard = () => {
           <Card className="p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Dispositivos</h2>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleConnectNewDevice}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Conectar nuevo
               </Button>
             </div>
-            <DeviceList />
+            
+            {showQRScanner ? (
+              <QRCodeScanner onScanComplete={handleScanComplete} />
+            ) : (
+              <DeviceList />
+            )}
           </Card>
 
           {/* Flujos de mensaje */}
