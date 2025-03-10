@@ -43,6 +43,7 @@ export const authService = {
         
         if (profileData) {
           localStorage.setItem('user', JSON.stringify({
+            id: data.user.id,
             email: credentials.email,
             rol: profileData.tipo,
             nombre: `${profileData.nombre} ${profileData.apellidos}`.trim() || 'Usuario'
@@ -123,7 +124,9 @@ export const authService = {
         password: userData.password,
         options: {
           data: {
-            tipo: userData.rol
+            tipo: userData.rol,
+            nombre: userData.nombre.split(' ')[0] || '',
+            apellidos: userData.nombre.split(' ').slice(1).join(' ') || ''
           }
         }
       });

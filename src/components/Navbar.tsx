@@ -3,11 +3,13 @@ import { useState, useEffect } from 'react';
 import { Menu, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import LoginForm from './LoginForm';
+import RegisterForm from './RegisterForm';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -46,19 +48,22 @@ const Navbar = () => {
                 <button className="btn-secondary">Iniciar Sesión</button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
-                <LoginForm onSuccessfulLogin={() => setIsLoginModalOpen(false)} />
+                <LoginForm 
+                  onSuccessfulLogin={() => setIsLoginModalOpen(false)} 
+                  onClose={() => setIsLoginModalOpen(false)}
+                />
               </DialogContent>
             </Dialog>
             
-            <Dialog>
+            <Dialog open={isRegisterModalOpen} onOpenChange={setIsRegisterModalOpen}>
               <DialogTrigger asChild>
                 <button className="btn-primary">Registrarse</button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
-                <div className="p-6 text-center">
-                  <h3 className="text-xl font-semibold mb-4">Registro de Usuario</h3>
-                  <p className="mb-4 text-gray-600">La funcionalidad de registro estará disponible próximamente.</p>
-                </div>
+                <RegisterForm 
+                  onSuccessfulRegister={() => setIsRegisterModalOpen(false)}
+                  onClose={() => setIsRegisterModalOpen(false)}
+                />
               </DialogContent>
             </Dialog>
           </div>
@@ -79,31 +84,37 @@ const Navbar = () => {
           <a href="#" className="block px-3 py-2 text-base font-medium text-ccd-700 rounded-md">Inicio</a>
           
           <div className="pt-4 flex flex-col space-y-3">
-            <Dialog>
+            <Dialog open={isLoginModalOpen} onOpenChange={(open) => {
+              setIsLoginModalOpen(open);
+              if (open) setMobileMenuOpen(false);
+            }}>
               <DialogTrigger asChild>
-                <button className="w-full btn-secondary" onClick={() => setMobileMenuOpen(false)}>
+                <button className="w-full btn-secondary">
                   Iniciar Sesión
                 </button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
-                <LoginForm onSuccessfulLogin={() => {
-                  setIsLoginModalOpen(false);
-                  setMobileMenuOpen(false);
-                }} />
+                <LoginForm 
+                  onSuccessfulLogin={() => setIsLoginModalOpen(false)} 
+                  onClose={() => setIsLoginModalOpen(false)}
+                />
               </DialogContent>
             </Dialog>
             
-            <Dialog>
+            <Dialog open={isRegisterModalOpen} onOpenChange={(open) => {
+              setIsRegisterModalOpen(open);
+              if (open) setMobileMenuOpen(false);
+            }}>
               <DialogTrigger asChild>
-                <button className="w-full btn-primary" onClick={() => setMobileMenuOpen(false)}>
+                <button className="w-full btn-primary">
                   Registrarse
                 </button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
-                <div className="p-6 text-center">
-                  <h3 className="text-xl font-semibold mb-4">Registro de Usuario</h3>
-                  <p className="mb-4 text-gray-600">La funcionalidad de registro estará disponible próximamente.</p>
-                </div>
+                <RegisterForm 
+                  onSuccessfulRegister={() => setIsRegisterModalOpen(false)}
+                  onClose={() => setIsRegisterModalOpen(false)}
+                />
               </DialogContent>
             </Dialog>
           </div>

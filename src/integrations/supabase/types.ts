@@ -9,6 +9,57 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      administradores: {
+        Row: {
+          cargo: string | null
+          created_at: string
+          id: string
+          nivel_acceso: string | null
+          updated_at: string
+        }
+        Insert: {
+          cargo?: string | null
+          created_at?: string
+          id: string
+          nivel_acceso?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cargo?: string | null
+          created_at?: string
+          id?: string
+          nivel_acceso?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      asesores: {
+        Row: {
+          created_at: string
+          departamento: string | null
+          disponibilidad: boolean | null
+          especialidad: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          departamento?: string | null
+          disponibilidad?: boolean | null
+          especialidad?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          departamento?: string | null
+          disponibilidad?: boolean | null
+          especialidad?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -173,10 +224,41 @@ export type Database = {
           },
         ]
       }
+      estudiantes: {
+        Row: {
+          ciclo: number | null
+          codigo_estudiante: string | null
+          created_at: string
+          fecha_ingreso: string | null
+          id: string
+          programa: string | null
+          updated_at: string
+        }
+        Insert: {
+          ciclo?: number | null
+          codigo_estudiante?: string | null
+          created_at?: string
+          fecha_ingreso?: string | null
+          id: string
+          programa?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ciclo?: number | null
+          codigo_estudiante?: string | null
+          created_at?: string
+          fecha_ingreso?: string | null
+          id?: string
+          programa?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           apellidos: string | null
           created_at: string
+          estado: string
           id: string
           institucion: string | null
           nombre: string | null
@@ -186,6 +268,7 @@ export type Database = {
         Insert: {
           apellidos?: string | null
           created_at?: string
+          estado?: string
           id: string
           institucion?: string | null
           nombre?: string | null
@@ -195,6 +278,7 @@ export type Database = {
         Update: {
           apellidos?: string | null
           created_at?: string
+          estado?: string
           id?: string
           institucion?: string | null
           nombre?: string | null
