@@ -1,9 +1,11 @@
 
 import { useState, useEffect } from 'react';
-import { MessageCircle, X, Bot, UserRound } from 'lucide-react';
+import { MessageCircle, X } from 'lucide-react';
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { authService } from '@/services/authService';
+import { chatService } from '@/services/chatService';
+import { supabase } from '@/integrations/supabase/client';
 import ChatBox from './ChatBox';
 
 const ChatBubble = () => {
@@ -12,20 +14,74 @@ const ChatBubble = () => {
   const [queueLength, setQueueLength] = useState(0);
   const [estimatedResponseTime, setEstimatedResponseTime] = useState(0);
   const isLoggedIn = authService.isAuthenticated();
+  const [activeChats, setActiveChats] = useState<any[]>([]);
 
-  // Simulate receiving messages for demo purposes
+  // Fetch user chats on login
   useEffect(() => {
-    if (isLoggedIn && !isOpen) {
-      const interval = setInterval(() => {
-        // Only add unread messages randomly when chat is closed and user is logged in
-        if (Math.random() > 0.85) {
-          setUnreadMessages(prev => prev + 1);
+    if (isLoggedIn) {
+      const fetchUserChats = async () => {
+        const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+        if (userProfile.id) {
+          const userChats = await chatService.getChatsForUser(userProfile.id, 'active');
+          setActiveChats(userChats);
+          
+          // Calculate unread messages
+          const chatIds = userChats.map(chat => chat.id);
+          let totalUnread = 0;
+          
+          for (const chatId of chatIds) {
+            const messages = await chatService.getChatMessages(chatId);
+            const unread = messages.filter(msg => 
+              !msg.is_read && msg.sender_id !== userProfile.id
+            ).length;
+            totalUnread += unread;
+          }
+          
+          setUnreadMessages(totalUnread);
         }
-      }, 30000); // Check every 30 seconds
+      };
       
-      return () => clearInterval(interval);
+      fetchUserChats();
+      
+      // Subscribe to new messages
+      const subscribeToAllChats = async () => {
+        const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+        if (userProfile.id) {
+          const userChats = await chatService.getChatsForUser(userProfile.id);
+          
+          // Subscribe to each chat
+          const subscriptions = userChats.map(chat => 
+            chatService.subscribeToMessages(
+              chat.id,
+              () => {
+                // Increment unread count when chat is closed
+                if (!isOpen) {
+                  setUnreadMessages(prev => prev + 1);
+                }
+              }
+            )
+          );
+          
+          return () => {
+            // Clean up subscriptions
+            subscriptions.forEach(subscription => {
+              supabase.removeChannel(subscription);
+            });
+          };
+        }
+      };
+      
+      const unsubscribe = subscribeToAllChats();
+      
+      return () => {
+        if (unsubscribe) {
+          unsubscribe.then(cleanup => {
+            if (cleanup) cleanup();
+          });
+        }
+      };
     }
-  }, [isLoggedIn, isOpen]);
+  }, [isLoggedIn]);
 
   // Simulate queue metrics - in a real app this would come from an API
   useEffect(() => {
@@ -39,6 +95,18 @@ const ChatBubble = () => {
   const handleOpenChat = () => {
     setIsOpen(true);
     setUnreadMessages(0); // Reset unread messages when opening chat
+    
+    // Mark messages as read
+    const markAllAsRead = async () => {
+      const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+      if (userProfile.id) {
+        for (const chat of activeChats) {
+          await chatService.markMessagesAsRead(chat.id, userProfile.id);
+        }
+      }
+    };
+    
+    markAllAsRead();
   };
 
   const handleCloseChat = () => {

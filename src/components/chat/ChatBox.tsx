@@ -1,18 +1,24 @@
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Bot, UserRound, Send } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import LoginForm from '@/components/LoginForm';
+import { authService } from '@/services/authService';
+import { chatService } from '@/services/chatService';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ChatBoxProps {
   isLoggedIn: boolean;
 }
 
 interface Message {
+  id: string;
   sender: 'user' | 'agent' | 'bot';
   text: string;
   timestamp: Date;
+  is_read: boolean;
 }
 
 const ChatBox = ({ isLoggedIn }: ChatBoxProps) => {
@@ -20,43 +26,155 @@ const ChatBox = ({ isLoggedIn }: ChatBoxProps) => {
   const [currentMessage, setCurrentMessage] = useState('');
   const [selectedOption, setSelectedOption] = useState<'agent' | 'bot' | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Initial welcome message based on login status
   const welcomeMessage = isLoggedIn
     ? "¿Cómo podemos ayudarte hoy? Escoge una opción:"
     : "Bienvenido al chat de soporte. Para continuar, necesitas iniciar sesión:";
 
-  const handleSendMessage = () => {
-    if (!currentMessage.trim()) return;
-    
-    // Add user message
-    const userMessage: Message = {
-      sender: 'user',
-      text: currentMessage,
-      timestamp: new Date()
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setCurrentMessage('');
-    
-    // Simulate response
-    setTimeout(() => {
-      let responseText = '';
+  useEffect(() => {
+    if (isLoggedIn && currentChatId) {
+      // Load existing messages
+      loadMessages();
       
-      if (selectedOption === 'agent') {
-        responseText = "Gracias por tu mensaje. Un asesor lo revisará y te responderá pronto.";
+      // Subscribe to new messages
+      const subscription = chatService.subscribeToMessages(
+        currentChatId,
+        (payload) => {
+          const newMessage = payload.new;
+          if (newMessage) {
+            const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+            
+            // Don't add messages that are from the current user (already added)
+            if (newMessage.sender_id !== userProfile.id) {
+              const senderType = newMessage.profiles?.tipo === 'advisor' ? 'agent' : 'bot';
+              
+              setMessages(prev => [
+                ...prev,
+                {
+                  id: newMessage.id,
+                  sender: senderType,
+                  text: newMessage.message,
+                  timestamp: new Date(newMessage.created_at),
+                  is_read: newMessage.is_read
+                }
+              ]);
+            }
+          }
+        }
+      );
+
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    }
+  }, [isLoggedIn, currentChatId]);
+
+  useEffect(() => {
+    // Scroll to bottom whenever messages change
+    scrollToBottom();
+  }, [messages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const loadMessages = async () => {
+    if (!currentChatId) return;
+    
+    const chatMessages = await chatService.getChatMessages(currentChatId);
+    
+    const formattedMessages = chatMessages.map(msg => {
+      const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+      let senderType: 'user' | 'agent' | 'bot';
+      
+      if (msg.sender_id === userProfile.id) {
+        senderType = 'user';
       } else {
-        responseText = "Soy el asistente virtual de CCD. Estoy aquí para ayudarte con preguntas frecuentes sobre trámites académicos.";
+        senderType = msg.profiles?.tipo === 'advisor' ? 'agent' : 'bot';
       }
       
-      const responseMessage: Message = {
-        sender: selectedOption || 'bot',
-        text: responseText,
-        timestamp: new Date()
+      return {
+        id: msg.id,
+        sender: senderType,
+        text: msg.message,
+        timestamp: new Date(msg.created_at),
+        is_read: msg.is_read
+      };
+    });
+    
+    setMessages(formattedMessages);
+    
+    // Mark messages as read
+    const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+    if (userProfile.id) {
+      await chatService.markMessagesAsRead(currentChatId, userProfile.id);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!currentMessage.trim()) return;
+    
+    const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!userProfile.id) {
+      toast.error('No se pudo identificar al usuario');
+      return;
+    }
+    
+    // Create chat if it doesn't exist
+    if (!currentChatId) {
+      const chatId = await chatService.createChat({
+        title: `Chat de ${userProfile.nombre || 'Usuario'}`,
+        userId: userProfile.id,
+        isBotConversation: selectedOption === 'bot'
+      });
+      
+      if (chatId) {
+        setCurrentChatId(chatId);
+        
+        // Add user message
+        const userMessage: Message = {
+          id: Date.now().toString(),
+          sender: 'user',
+          text: currentMessage,
+          timestamp: new Date(),
+          is_read: true
+        };
+        
+        setMessages(prev => [...prev, userMessage]);
+        
+        // Send message to Supabase
+        await chatService.sendMessage({
+          chatId,
+          senderId: userProfile.id,
+          message: currentMessage
+        });
+        
+        setCurrentMessage('');
+      }
+    } else {
+      // Add user message to UI immediately
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        sender: 'user',
+        text: currentMessage,
+        timestamp: new Date(),
+        is_read: true
       };
       
-      setMessages(prev => [...prev, responseMessage]);
-    }, 1000);
+      setMessages(prev => [...prev, userMessage]);
+      
+      // Send message to Supabase
+      await chatService.sendMessage({
+        chatId: currentChatId,
+        senderId: userProfile.id,
+        message: currentMessage
+      });
+      
+      setCurrentMessage('');
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -66,19 +184,46 @@ const ChatBox = ({ isLoggedIn }: ChatBoxProps) => {
     }
   };
 
-  const handleOptionSelect = (option: 'agent' | 'bot') => {
+  const handleOptionSelect = async (option: 'agent' | 'bot') => {
     setSelectedOption(option);
     
-    // Add system message based on selection
-    const systemMessage: Message = {
-      sender: option,
-      text: option === 'agent' 
-        ? "Has seleccionado chatear con un asesor en vivo. ¿En qué podemos ayudarte?"
-        : "Has seleccionado el asistente virtual. ¿Qué información necesitas?",
-      timestamp: new Date()
-    };
+    const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!userProfile.id) {
+      toast.error('No se pudo identificar al usuario');
+      return;
+    }
     
-    setMessages([systemMessage]);
+    // Create a new chat
+    const chatId = await chatService.createChat({
+      title: `Chat de ${userProfile.nombre || 'Usuario'}`,
+      userId: userProfile.id,
+      isBotConversation: option === 'bot'
+    });
+    
+    if (chatId) {
+      setCurrentChatId(chatId);
+      
+      // Add system message based on selection
+      const systemMessage: Message = {
+        id: Date.now().toString(),
+        sender: option,
+        text: option === 'agent' 
+          ? "Has seleccionado chatear con un asesor en vivo. ¿En qué podemos ayudarte?"
+          : "Has seleccionado el asistente virtual. ¿Qué información necesitas?",
+        timestamp: new Date(),
+        is_read: true
+      };
+      
+      setMessages([systemMessage]);
+      
+      // Send the system message to Supabase
+      const systemSenderId = option === 'bot' ? 'system-bot' : 'system-agent';
+      await chatService.sendMessage({
+        chatId,
+        senderId: systemSenderId,
+        message: systemMessage.text
+      });
+    }
   };
 
   return (
@@ -158,6 +303,7 @@ const ChatBox = ({ isLoggedIn }: ChatBoxProps) => {
                 </div>
               </div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
         )}
       </div>

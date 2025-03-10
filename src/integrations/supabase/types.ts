@@ -80,6 +80,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "chat_messages_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "chat_messages_sender_id_fkey"
             columns: ["sender_id"]
             isOneToOne: false
@@ -87,6 +94,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      chats: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          id: string
+          is_bot_conversation: boolean
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          id?: string
+          is_bot_conversation?: boolean
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          id?: string
+          is_bot_conversation?: boolean
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       documentos: {
         Row: {

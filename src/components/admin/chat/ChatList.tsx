@@ -2,21 +2,43 @@
 import { UserRound, Bot } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ChatMessage } from "./types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ChatListProps {
   chats: ChatMessage[];
   selectedChat: string | null;
   onSelectChat: (chatId: string) => void;
+  loading: boolean;
 }
 
-const ChatList = ({ chats, selectedChat, onSelectChat }: ChatListProps) => {
+const ChatList = ({ chats, selectedChat, onSelectChat, loading }: ChatListProps) => {
   return (
     <div className="lg:col-span-1 border rounded-lg overflow-hidden">
       <div className="p-4 bg-gray-50 border-b">
         <h3 className="font-medium">Conversaciones</h3>
       </div>
       <div className="overflow-y-auto max-h-[600px]">
-        {chats.length > 0 ? (
+        {loading ? (
+          // Loading skeleton
+          Array(3).fill(0).map((_, i) => (
+            <div key={i} className="p-4 border-b">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center">
+                  <Skeleton className="h-5 w-5 mr-2 rounded-full" />
+                  <div>
+                    <Skeleton className="h-4 w-24 mb-1" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                </div>
+                <Skeleton className="h-3 w-10" />
+              </div>
+              <Skeleton className="h-3 w-full mt-2" />
+              <div className="mt-2">
+                <Skeleton className="h-5 w-16" />
+              </div>
+            </div>
+          ))
+        ) : chats.length > 0 ? (
           chats.map((chat) => (
             <div 
               key={chat.id}

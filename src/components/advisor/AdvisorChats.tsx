@@ -5,42 +5,146 @@ import { toast } from "sonner";
 import ChatList from "./chat/ChatList";
 import ChatDetail from "./chat/ChatDetail";
 import ChatEmptyState from "./chat/ChatEmptyState";
-import { ChatMessage, ChatFilter } from "./chat/types";
-import { mockChats } from "./chat/mockData";
+import { ChatMessage, ChatFilter, DBChatMessage } from "./chat/types";
+import { chatService } from "@/services/chatService";
+import { supabase } from "@/integrations/supabase/client";
 
 const AdvisorChats = () => {
   const [assignedChats, setAssignedChats] = useState<ChatMessage[]>([]);
   const [selectedChat, setSelectedChat] = useState<string | null>(null);
   const [chatFilter, setChatFilter] = useState<ChatFilter>("all");
   const [messageInput, setMessageInput] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [chatMessages, setChatMessages] = useState<DBChatMessage[]>([]);
 
-  // Simulate fetching assigned chats
+  // Fetch assigned chats from Supabase
   useEffect(() => {
-    // This would normally be an API call
-    setAssignedChats(mockChats);
-  }, []);
-
-  const handleResolveChat = (chatId: string) => {
-    setAssignedChats(prev => prev.map(chat => 
-      chat.id === chatId ? { ...chat, status: "resolved" } : chat
-    ));
-    toast.success("Chat marcado como resuelto");
-  };
-
-  const handleSelectChat = (chatId: string) => {
-    setSelectedChat(chatId);
-    // Mark as read when selected
-    setAssignedChats(prev => prev.map(chat => 
-      chat.id === chatId ? { ...chat, unreadCount: 0 } : chat
-    ));
-  };
-
-  const handleSendMessage = () => {
-    if (!messageInput.trim()) return;
+    const fetchChats = async () => {
+      setLoading(true);
+      
+      const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+      if (!userProfile.id) {
+        toast.error('No se pudo identificar al asesor');
+        setLoading(false);
+        return;
+      }
+      
+      const chatsData = await chatService.getAssignedChats(
+        userProfile.id, 
+        chatFilter !== 'all' ? chatFilter : undefined
+      );
+      
+      // Transform Supabase data to ChatMessage format
+      const formattedChats = chatsData.map(chat => {
+        return {
+          id: chat.id,
+          userName: `${chat.profiles?.nombre || ''} ${chat.profiles?.apellidos || ''}`.trim() || 'Usuario',
+          userEmail: 'usuario@ejemplo.com', // Could fetch from auth.users if needed
+          timestamp: new Date(chat.created_at),
+          lastMessage: 'Cargando último mensaje...',
+          status: chat.status,
+          type: chat.is_bot_conversation ? "bot" : "agent",
+          unreadCount: 0,
+          chat_id: chat.id,
+          user_id: chat.user_id
+        } as ChatMessage;
+      });
+      
+      setAssignedChats(formattedChats);
+      setLoading(false);
+    };
     
-    // In a real app, this would send the message to the API
-    toast.success("Mensaje enviado al estudiante");
-    setMessageInput("");
+    fetchChats();
+  }, [chatFilter]);
+
+  // Subscribe to changes in chat messages
+  useEffect(() => {
+    if (selectedChat) {
+      // Load initial messages
+      loadMessages(selectedChat);
+      
+      // Subscribe to new messages
+      const subscription = chatService.subscribeToMessages(
+        selectedChat,
+        () => {
+          // When a new message arrives, reload all messages
+          loadMessages(selectedChat);
+        }
+      );
+      
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    }
+  }, [selectedChat]);
+
+  const loadMessages = async (chatId: string) => {
+    const messages = await chatService.getChatMessages(chatId);
+    setChatMessages(messages);
+    
+    // Mark messages as read
+    const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+    if (userProfile.id) {
+      await chatService.markMessagesAsRead(chatId, userProfile.id);
+    }
+    
+    // Update last message in chat list
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      setAssignedChats(prev => prev.map(chat => 
+        chat.id === chatId ? { 
+          ...chat, 
+          lastMessage: lastMessage.message,
+          unreadCount: 0
+        } : chat
+      ));
+    }
+  };
+
+  const handleResolveChat = async (chatId: string) => {
+    const success = await chatService.markChatAsResolved(chatId);
+    
+    if (success) {
+      setAssignedChats(prev => prev.map(chat => 
+        chat.id === chatId ? { ...chat, status: "resolved" } : chat
+      ));
+      toast.success("Chat marcado como resuelto");
+    }
+  };
+
+  const handleSelectChat = async (chatId: string) => {
+    setSelectedChat(chatId);
+    
+    // Mark as read when selected
+    const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+    if (userProfile.id) {
+      await chatService.markMessagesAsRead(chatId, userProfile.id);
+      
+      setAssignedChats(prev => prev.map(chat => 
+        chat.id === chatId ? { ...chat, unreadCount: 0 } : chat
+      ));
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || !selectedChat) return;
+    
+    const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!userProfile.id) {
+      toast.error('No se pudo identificar al asesor');
+      return;
+    }
+    
+    const success = await chatService.sendMessage({
+      chatId: selectedChat,
+      senderId: userProfile.id,
+      message: messageInput
+    });
+    
+    if (success) {
+      setMessageInput("");
+      // The message will be added to the list via the subscription
+    }
   };
 
   const getSelectedChat = () => {
@@ -69,6 +173,7 @@ const AdvisorChats = () => {
               selectedChat={selectedChat}
               onSelectChat={handleSelectChat}
               filter={chatFilter}
+              loading={loading}
             />
 
             {/* Chat Detail */}
@@ -76,6 +181,7 @@ const AdvisorChats = () => {
               {selectedChat && getSelectedChat() ? (
                 <ChatDetail 
                   chat={getSelectedChat()!}
+                  messages={chatMessages}
                   messageInput={messageInput}
                   setMessageInput={setMessageInput}
                   handleSendMessage={handleSendMessage}

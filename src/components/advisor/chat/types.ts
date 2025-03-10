@@ -23,3 +23,20 @@ export interface DBChatMessage {
     tipo: string;
   };
 }
+
+// Add Supabase database types for chats
+export interface DBChat {
+  id: string;
+  title: string;
+  created_at: string;
+  user_id: string;
+  status: 'active' | 'resolved';
+  assigned_to?: string;
+  is_bot_conversation: boolean;
+  // User data joined from profiles table
+  profiles?: {
+    nombre: string;
+    apellidos: string;
+    tipo: string;
+  };
+}

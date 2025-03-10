@@ -5,10 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { ChatFilter, ChatMessage } from "./chat/types";
-import { mockChats, advisors } from "./chat/chatData";
+import { advisors } from "./chat/chatData";
 import ChatList from "./chat/ChatList";
 import ChatDetail from "./chat/ChatDetail";
 import ChatEmptyState from "./chat/ChatEmptyState";
+import { chatService } from "@/services/chatService";
+import { supabase } from "@/integrations/supabase/client";
+import { DBChatMessage } from "@/components/advisor/chat/types";
 
 const ChatManagement = () => {
   const [chats, setChats] = useState<ChatMessage[]>([]);
@@ -17,49 +20,153 @@ const ChatManagement = () => {
   const [messageInput, setMessageInput] = useState("");
   const [internalMessageInput, setInternalMessageInput] = useState("");
   const [selectedAdvisor, setSelectedAdvisor] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [chatMessages, setChatMessages] = useState<DBChatMessage[]>([]);
 
-  // Simulate fetching chat data
+  // Fetch all chats from Supabase
   useEffect(() => {
-    setChats(mockChats);
-  }, []);
+    const fetchChats = async () => {
+      setLoading(true);
+      
+      const chatsData = await chatService.getAllChats(
+        chatFilter !== 'all' ? chatFilter : undefined
+      );
+      
+      // Transform Supabase data to ChatMessage format
+      const formattedChats = chatsData.map(chat => {
+        return {
+          id: chat.id,
+          userName: `${chat.profiles?.nombre || ''} ${chat.profiles?.apellidos || ''}`.trim() || 'Usuario',
+          userEmail: 'usuario@ejemplo.com', // Could fetch from auth.users if needed
+          timestamp: new Date(chat.created_at),
+          lastMessage: 'Cargando último mensaje...',
+          status: chat.status === 'active' 
+            ? chat.assigned_to ? 'active' : 'waiting'
+            : 'resolved',
+          type: chat.is_bot_conversation ? "bot" : "agent",
+          assignedTo: chat.assigned_to ? `Asesor ID: ${chat.assigned_to}` : undefined,
+          unreadCount: 0,
+          chat_id: chat.id,
+          user_id: chat.user_id
+        } as ChatMessage;
+      });
+      
+      setChats(formattedChats);
+      setLoading(false);
+    };
+    
+    fetchChats();
+  }, [chatFilter]);
 
-  const handleAssignChat = (chatId: string) => {
+  // Subscribe to changes in chat messages
+  useEffect(() => {
+    if (selectedChat) {
+      // Load initial messages
+      loadMessages(selectedChat);
+      
+      // Subscribe to new messages
+      const subscription = chatService.subscribeToMessages(
+        selectedChat,
+        () => {
+          // When a new message arrives, reload all messages
+          loadMessages(selectedChat);
+        }
+      );
+      
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    }
+  }, [selectedChat]);
+
+  const loadMessages = async (chatId: string) => {
+    const messages = await chatService.getChatMessages(chatId);
+    setChatMessages(messages);
+    
+    // Mark messages as read
+    const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+    if (userProfile.id) {
+      await chatService.markMessagesAsRead(chatId, userProfile.id);
+    }
+    
+    // Update last message in chat list
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      setChats(prev => prev.map(chat => 
+        chat.id === chatId ? { 
+          ...chat, 
+          lastMessage: lastMessage.message,
+          unreadCount: 0
+        } : chat
+      ));
+    }
+  };
+
+  const handleAssignChat = async (chatId: string) => {
     if (!selectedAdvisor) {
       toast.error("Selecciona un asesor para asignar el chat");
       return;
     }
     
-    const advisorName = advisors.find(a => a.id === selectedAdvisor)?.name || "Asesor sin nombre";
+    const success = await chatService.assignChatToAdvisor(chatId, selectedAdvisor);
     
-    setChats(prev => prev.map(chat => 
-      chat.id === chatId ? { ...chat, status: "active", assignedTo: advisorName } : chat
-    ));
-    
-    toast.success(`Chat asignado a ${advisorName}`);
-    setSelectedAdvisor("");
+    if (success) {
+      const advisorName = advisors.find(a => a.id === selectedAdvisor)?.name || "Asesor sin nombre";
+      
+      setChats(prev => prev.map(chat => 
+        chat.id === chatId ? { ...chat, status: "active", assignedTo: advisorName } : chat
+      ));
+      
+      toast.success(`Chat asignado a ${advisorName}`);
+      setSelectedAdvisor("");
+    }
   };
 
-  const handleResolveChat = (chatId: string) => {
-    setChats(prev => prev.map(chat => 
-      chat.id === chatId ? { ...chat, status: "resolved" } : chat
-    ));
-    toast.success("Chat marcado como resuelto");
+  const handleResolveChat = async (chatId: string) => {
+    const success = await chatService.markChatAsResolved(chatId);
+    
+    if (success) {
+      setChats(prev => prev.map(chat => 
+        chat.id === chatId ? { ...chat, status: "resolved" } : chat
+      ));
+      toast.success("Chat marcado como resuelto");
+    }
   };
 
-  const handleSelectChat = (chatId: string) => {
+  const handleSelectChat = async (chatId: string) => {
     setSelectedChat(chatId);
+    
     // Mark as read when selected
-    setChats(prev => prev.map(chat => 
-      chat.id === chatId ? { ...chat, unreadCount: 0 } : chat
-    ));
+    const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+    if (userProfile.id) {
+      await chatService.markMessagesAsRead(chatId, userProfile.id);
+      
+      setChats(prev => prev.map(chat => 
+        chat.id === chatId ? { ...chat, unreadCount: 0 } : chat
+      ));
+    }
   };
 
-  const handleSendMessage = () => {
-    if (!messageInput.trim()) return;
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || !selectedChat) return;
     
-    // In a real app, this would send the message to the API
-    toast.success("Mensaje enviado al estudiante");
-    setMessageInput("");
+    const userProfile = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!userProfile.id) {
+      toast.error('No se pudo identificar al usuario');
+      return;
+    }
+    
+    const success = await chatService.sendMessage({
+      chatId: selectedChat,
+      senderId: userProfile.id,
+      message: messageInput
+    });
+    
+    if (success) {
+      setMessageInput("");
+      // The message will be added to the list via the subscription
+      toast.success("Mensaje enviado al estudiante");
+    }
   };
 
   const handleSendInternalMessage = () => {
@@ -113,6 +220,7 @@ const ChatManagement = () => {
               chats={filteredChats}
               selectedChat={selectedChat}
               onSelectChat={handleSelectChat}
+              loading={loading}
             />
 
             {/* Chat Detail */}
@@ -120,6 +228,7 @@ const ChatManagement = () => {
               {selectedChat && currentChat ? (
                 <ChatDetail
                   chat={currentChat}
+                  messages={chatMessages}
                   advisors={advisors}
                   selectedAdvisor={selectedAdvisor}
                   setSelectedAdvisor={setSelectedAdvisor}
