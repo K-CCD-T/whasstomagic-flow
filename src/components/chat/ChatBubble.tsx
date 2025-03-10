@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import { MessageCircle, X } from 'lucide-react';
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { authService } from '@/services/authService';
 import { chatService } from '@/services/chatService';
@@ -49,9 +48,12 @@ const ChatBubble = () => {
         if (userProfile.id) {
           const userChats = await chatService.getChatsForUser(userProfile.id);
           
+          // Create an array to store subscriptions
+          const channels = [];
+          
           // Subscribe to each chat
-          const subscriptions = userChats.map(chat => 
-            chatService.subscribeToMessages(
+          for (const chat of userChats) {
+            const channel = chatService.subscribeToMessages(
               chat.id,
               () => {
                 // Increment unread count when chat is closed
@@ -59,29 +61,32 @@ const ChatBubble = () => {
                   setUnreadMessages(prev => prev + 1);
                 }
               }
-            )
-          );
+            );
+            channels.push(channel);
+          }
           
+          // Return a cleanup function
           return () => {
-            // Clean up subscriptions
-            subscriptions.forEach(subscription => {
-              supabase.removeChannel(subscription);
-            });
+            // Clean up all channel subscriptions
+            for (const channel of channels) {
+              supabase.removeChannel(channel);
+            }
           };
         }
       };
       
-      const unsubscribe = subscribeToAllChats();
+      // Execute subscription and store cleanup function
+      let cleanup: (() => void) | undefined;
+      subscribeToAllChats().then(cleanupFn => {
+        cleanup = cleanupFn;
+      });
       
+      // Return cleanup function
       return () => {
-        if (unsubscribe) {
-          unsubscribe.then(cleanup => {
-            if (cleanup) cleanup();
-          });
-        }
+        if (cleanup) cleanup();
       };
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, isOpen]);
 
   // Simulate queue metrics - in a real app this would come from an API
   useEffect(() => {
@@ -142,6 +147,7 @@ const ChatBubble = () => {
       {/* Chat Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-md h-[500px] p-0 flex flex-col">
+          <DialogTitle className="sr-only">Chat de Soporte</DialogTitle>
           <div className="bg-ccd-600 text-white p-4 flex justify-between items-center">
             <div className="flex flex-col">
               <h3 className="text-lg font-medium">Soporte CCD</h3>

@@ -1,8 +1,7 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Bot, UserRound, Send } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import LoginForm from '@/components/LoginForm';
 import { authService } from '@/services/authService';
 import { chatService } from '@/services/chatService';
@@ -39,8 +38,8 @@ const ChatBox = ({ isLoggedIn }: ChatBoxProps) => {
       // Load existing messages
       loadMessages();
       
-      // Subscribe to new messages
-      const subscription = chatService.subscribeToMessages(
+      // Subscribe to new messages - now returns channel directly, not a promise
+      const channel = chatService.subscribeToMessages(
         currentChatId,
         (payload) => {
           const newMessage = payload.new;
@@ -67,7 +66,7 @@ const ChatBox = ({ isLoggedIn }: ChatBoxProps) => {
       );
 
       return () => {
-        supabase.removeChannel(subscription);
+        supabase.removeChannel(channel);
       };
     }
   }, [isLoggedIn, currentChatId]);
@@ -259,6 +258,7 @@ const ChatBox = ({ isLoggedIn }: ChatBoxProps) => {
                   <Button variant="default">Iniciar Sesión</Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-md">
+                  <DialogTitle className="sr-only">Iniciar Sesión</DialogTitle>
                   <LoginForm onSuccessfulLogin={() => setIsLoginModalOpen(false)} />
                 </DialogContent>
               </Dialog>

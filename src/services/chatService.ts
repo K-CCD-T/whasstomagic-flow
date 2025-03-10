@@ -74,7 +74,7 @@ export const chatService = {
         `)
         .eq('user_id', userId);
       
-      if (filter && filter !== 'all') {
+      if (filter) {
         query = query.eq('status', filter);
       }
       
@@ -99,7 +99,7 @@ export const chatService = {
         `)
         .eq('assigned_to', advisorId);
       
-      if (filter && filter !== 'all') {
+      if (filter) {
         query = query.eq('status', filter);
       }
       
@@ -126,7 +126,7 @@ export const chatService = {
       if (filter) {
         if (filter === 'waiting') {
           query = query.is('assigned_to', null).eq('status', 'active');
-        } else if (filter !== 'all') {
+        } else if (filter === 'active' || filter === 'resolved') {
           query = query.eq('status', filter);
         }
       }
@@ -194,7 +194,8 @@ export const chatService = {
     }
   },
 
-  async subscribeToMessages(chatId: string, callback: (message: any) => void) {
+  subscribeToMessages(chatId: string, callback: (payload: any) => void) {
+    // Return the channel directly, not a promise
     return supabase
       .channel(`chat:${chatId}`)
       .on(

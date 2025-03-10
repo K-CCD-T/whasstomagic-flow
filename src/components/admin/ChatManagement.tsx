@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Clock, MessageCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -64,8 +63,8 @@ const ChatManagement = () => {
       // Load initial messages
       loadMessages(selectedChat);
       
-      // Subscribe to new messages
-      const subscription = chatService.subscribeToMessages(
+      // Subscribe to new messages - now returns channel directly, not a promise
+      const channel = chatService.subscribeToMessages(
         selectedChat,
         () => {
           // When a new message arrives, reload all messages
@@ -74,7 +73,7 @@ const ChatManagement = () => {
       );
       
       return () => {
-        supabase.removeChannel(subscription);
+        supabase.removeChannel(channel);
       };
     }
   }, [selectedChat]);
@@ -217,7 +216,7 @@ const ChatManagement = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Chat List */}
             <ChatList 
-              chats={filteredChats}
+              chats={chats}
               selectedChat={selectedChat}
               onSelectChat={handleSelectChat}
               loading={loading}

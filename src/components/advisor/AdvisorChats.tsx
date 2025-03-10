@@ -63,8 +63,8 @@ const AdvisorChats = () => {
       // Load initial messages
       loadMessages(selectedChat);
       
-      // Subscribe to new messages
-      const subscription = chatService.subscribeToMessages(
+      // Subscribe to new messages - now returns channel directly, not a promise
+      const channel = chatService.subscribeToMessages(
         selectedChat,
         () => {
           // When a new message arrives, reload all messages
@@ -73,7 +73,7 @@ const AdvisorChats = () => {
       );
       
       return () => {
-        supabase.removeChannel(subscription);
+        supabase.removeChannel(channel);
       };
     }
   }, [selectedChat]);

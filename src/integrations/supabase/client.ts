@@ -13,17 +13,30 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   }
 });
 
-// Enable real-time for chat_messages and chats tables
-const enableRealtimeForTables = async () => {
-  try {
-    await supabase.realtime.setTables([
-      'chat_messages',
-      'chats'
-    ]);
-  } catch (error) {
-    console.error('Error enabling real-time for tables:', error);
-  }
+// Enable realtime for messages and chats using channel-based API
+export const setupRealtimeSubscription = () => {
+  // Create a channel for chat messages
+  supabase.channel('public:chat_messages')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'chat_messages'
+    }, payload => {
+      console.log('Change received!', payload);
+    })
+    .subscribe();
+
+  // Create a channel for chats
+  supabase.channel('public:chats')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'chats'
+    }, payload => {
+      console.log('Chat change received!', payload);
+    })
+    .subscribe();
 };
 
-// Call the function to enable real-time
-enableRealtimeForTables();
+// Call the function to set up realtime
+setupRealtimeSubscription();
