@@ -20,7 +20,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanComplete }) => {
     // Simulamos el proceso de escaneo
     toast({
       title: "Escaneando",
-      description: "Abre WhatsApp en tu teléfono, ve a Ajustes > WhatsApp Web y escanea este código",
+      description: "Abrekevinnnnnnnnnnn, ve a Ajustes > WhatsApp Web y escanea este código",
     });
     
     // Simulamos una conexión exitosa después de 3 segundos
